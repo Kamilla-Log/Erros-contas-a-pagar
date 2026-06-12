@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tracker de Erros CP — Logcomex</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Funnel+Display:wght@700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" crossorigin="anonymous"></script>
+<style>
+:root {
+  --purple-dark:#2D085D; --purple-mid:#6613D0; --purple-light:#8E44ED; --purple-pale:#E2D0FA;
+  --orange:#FE8F1C; --bg:#F5F6FC; --fg:#0B0D19; --card:#FFFFFF; --muted:#6B7280;
+  --border:#E5E7EB; --success:#1FAC66; --danger:#C70404; --warning:#C99D02; --info:#1DA6AE;
+  --radius:12px; --gap:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--fg);font-size:14px;min-height:100vh;}
+
+/* HEADER */
+.header{background:linear-gradient(135deg,var(--purple-dark),var(--purple-mid));padding:20px 32px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.logo-text{font-family:'Funnel Display',sans-serif;color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.5px;}
+.logo-text span{color:var(--orange);}
+.header-sub{color:rgba(255,255,255,0.65);font-size:13px;margin-top:2px;}
+.tab-bar{display:flex;gap:6px;flex-wrap:wrap;}
+.tab-btn{padding:8px 18px;border:none;border-radius:8px;font-family:'Poppins',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.75);}
+.tab-btn.active{background:#fff;color:var(--purple-mid);}
+.tab-btn:hover:not(.active){background:rgba(255,255,255,0.2);color:#fff;}
+
+/* NAV SECUNDÁRIA (subtabs) */
+.subtab-bar{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;}
+.subtab-btn{padding:10px 22px;border:none;background:transparent;font-family:'Poppins',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.15s;}
+.subtab-btn.active{color:var(--purple-mid);border-bottom-color:var(--purple-mid);}
+.subtab-btn:hover:not(.active){color:var(--fg);}
+
+/* CONTAINER */
+.container{max-width:1300px;margin:0 auto;padding:24px 32px;}
+.view{display:none;} .view.active{display:block;}
+.subview{display:none;} .subview.active{display:block;}
+
+/* SECTION HEADERS */
+.section-header{display:flex;align-items:center;gap:10px;margin-bottom:20px;}
+.section-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.section-icon.janela{background:#EDE9FE;}
+.section-icon.conciliacao{background:#DCFCE7;}
+.section-icon.outros{background:#FEF3C7;}
+.section-title{font-family:'Funnel Display',sans-serif;font-size:18px;font-weight:700;}
+.section-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+
+/* KPI ROW */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap);margin-bottom:var(--gap);}
+.kpi-row-3{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap);margin-bottom:var(--gap);}
+.kpi-card{background:var(--card);border-radius:var(--radius);padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,0.07);border-top:3px solid var(--purple-mid);position:relative;overflow:hidden;}
+.kpi-card.danger{border-top-color:var(--danger);}
+.kpi-card.warning{border-top-color:var(--warning);}
+.kpi-card.success{border-top-color:var(--success);}
+.kpi-card.info{border-top-color:var(--info);}
+.kpi-card.orange{border-top-color:var(--orange);}
+.kpi-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:5px;}
+.kpi-value{font-size:30px;font-weight:300;line-height:1;}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+
+/* CHARTS */
+.charts-row{display:grid;grid-template-columns:2fr 1fr;gap:var(--gap);margin-bottom:var(--gap);}
+.charts-row-2{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);margin-bottom:var(--gap);}
+.charts-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--gap);margin-bottom:var(--gap);}
+.chart-card{background:var(--card);border-radius:var(--radius);padding:20px 22px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+.chart-title{font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.badge{background:var(--purple-pale);color:var(--purple-mid);font-size:10px;padding:2px 8px;border-radius:20px;font-weight:500;}
+.badge.green{background:#DCFCE7;color:#166534;}
+.badge.orange{background:#FEF3C7;color:#92400E;}
+canvas{max-height:200px;}
+
+/* TABELA */
+.table-card{background:var(--card);border-radius:var(--radius);padding:20px 22px;box-shadow:0 1px 4px rgba(0,0,0,0.07);overflow-x:auto;}
+.table-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+.filter-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.filter-row select,.filter-row input{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-family:'Poppins',sans-serif;font-size:12px;color:var(--fg);background:#fff;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead th{text-align:left;padding:8px 12px;border-bottom:2px solid var(--border);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;user-select:none;}
+tbody td{padding:9px 12px;border-bottom:1px solid #F3F4F6;vertical-align:top;}
+tbody tr:hover{background:#FAFAFA;}
+tbody tr:last-child td{border-bottom:none;}
+
+/* BADGES */
+.pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap;}
+.resp-thai{background:#FEF3C7;color:#92400E;}
+.resp-kamilla{background:#EDE9FE;color:var(--purple-mid);}
+.resp-dp{background:#DCFCE7;color:#166534;}
+.resp-contabilidade{background:#DBEAFE;color:#1E40AF;}
+.imp-retrabalho{background:#FEF9C3;color:#713F12;}
+.imp-financeiro{background:#FEE2E2;color:#991B1B;}
+.imp-multa{background:#FEE2E2;color:#991B1B;}
+.imp-ruido{background:#F3F4F6;color:#4B5563;}
+.imp-atraso{background:#FFF7ED;color:#9A3412;}
+.cat-janela{background:#EDE9FE;color:#5B21B6;}
+.cat-conciliacao{background:#DCFCE7;color:#166534;}
+.cat-outros{background:#FEF3C7;color:#92400E;}
+
+/* FORM */
+.form-card{background:var(--card);border-radius:var(--radius);padding:32px;box-shadow:0 1px 4px rgba(0,0,0,0.07);max-width:800px;margin:0 auto;}
+.form-title{font-family:'Funnel Display',sans-serif;font-size:20px;font-weight:700;margin-bottom:4px;}
+.form-sub{font-size:13px;color:var(--muted);margin-bottom:24px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-field{display:flex;flex-direction:column;gap:5px;}
+.form-field.full{grid-column:span 2;}
+.form-field.span3{grid-column:span 2;}
+.form-field label{font-size:12px;font-weight:500;}
+.form-field label .req{color:var(--danger);}
+.form-field input,.form-field select,.form-field textarea{padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:'Poppins',sans-serif;font-size:13px;color:var(--fg);background:#fff;transition:border-color 0.15s;outline:none;}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--purple-mid);box-shadow:0 0 0 3px rgba(102,19,208,0.08);}
+.form-field textarea{resize:vertical;min-height:68px;}
+.section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.7px;color:var(--purple-mid);margin:20px 0 12px;}
+.divider{border:none;border-top:1px solid var(--border);margin:20px 0;}
+.btn-submit{background:linear-gradient(135deg,var(--purple-mid),var(--purple-light));color:#fff;border:none;border-radius:8px;padding:11px 32px;font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:opacity 0.2s;margin-top:20px;}
+.btn-submit:hover{opacity:0.88;}
+.btn-clear{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:11px 24px;font-family:'Poppins',sans-serif;font-size:14px;cursor:pointer;margin-top:20px;margin-left:10px;}
+.btn-clear:hover{background:#f3f4f6;}
+
+/* TOAST */
+.toast{position:fixed;bottom:28px;right:28px;background:var(--success);color:#fff;padding:12px 22px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,0.2);opacity:0;pointer-events:none;transition:opacity 0.3s;z-index:999;}
+.toast.show{opacity:1;}
+
+.empty-state{text-align:center;padding:48px;color:var(--muted);}
+.empty-state .icon{font-size:36px;margin-bottom:8px;}
+.ciente-btn{padding:3px 12px;border:1.5px solid var(--purple-mid);background:transparent;color:var(--purple-mid);border-radius:20px;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s;}
+.ciente-btn:hover{background:var(--purple-mid);color:#fff;}
+.ciente-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#DCFCE7;color:#166534;border-radius:20px;font-size:11px;font-weight:600;}
+.nao-ciente-badge{display:inline-block;padding:3px 10px;background:#F3F4F6;color:var(--muted);border-radius:20px;font-size:11px;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:9999;}
+.modal-box{background:#fff;border-radius:16px;padding:36px 32px;max-width:380px;width:90%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.18);}
+.modal-title{font-family:'Funnel Display',sans-serif;font-size:20px;font-weight:700;margin-bottom:8px;}
+.modal-sub{font-size:13px;color:var(--muted);margin-bottom:24px;}
+.modal-btns{display:flex;gap:12px;justify-content:center;}
+.modal-btn{padding:10px 28px;border:none;border-radius:8px;font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:opacity 0.2s;}
+.modal-btn.kamilla{background:var(--purple-mid);color:#fff;}
+.modal-btn.thaiane{background:#FE8F1C;color:#fff;}
+.modal-btn:hover{opacity:0.85;}
+
+/* OVERVIEW CARDS */
+.overview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap);margin-bottom:var(--gap);}
+.ov-card{background:var(--card);border-radius:var(--radius);padding:22px 24px;box-shadow:0 1px 4px rgba(0,0,0,0.07);cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;border:2px solid transparent;}
+.ov-card:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.1);}
+.ov-card.janela{border-top:4px solid var(--purple-mid);}
+.ov-card.conciliacao{border-top:4px solid var(--success);}
+.ov-card.outros{border-top:4px solid var(--orange);}
+.ov-card-icon{font-size:28px;margin-bottom:10px;}
+.ov-card-title{font-family:'Funnel Display',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px;}
+.ov-card-count{font-size:36px;font-weight:300;line-height:1;margin-bottom:4px;}
+.ov-card-desc{font-size:12px;color:var(--muted);}
+
+@media(max-width:900px){
+  .kpi-row,.kpi-row-3{grid-template-columns:repeat(2,1fr);}
+  .charts-row,.charts-row-2,.charts-row-3,.overview-grid{grid-template-columns:1fr;}
+  .form-grid{grid-template-columns:1fr;}
+  .form-field.full,.form-field.span3{grid-column:span 1;}
+  .container{padding:16px;}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo-text">Logcomex<span>.</span></div>
+    <div class="header-sub">Tracker de Erros — Contas a Pagar</div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+    <button class="tab-btn" onclick="switchTab('form')">➕ Registrar</button>
+    <button class="tab-btn" onclick="switchTab('lista')">📋 Todos os Erros</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ══════════════════ DASHBOARD ══════════════════ -->
+  <div id="view-dashboard" class="view active">
+
+    <!-- Overview cards clicáveis -->
+    <div class="overview-grid">
+      <div class="ov-card janela" onclick="switchTab('dashboard');switchSubDash('janela')">
+        <div class="ov-card-icon">📋</div>
+        <div class="ov-card-title">Janela de Pagamento</div>
+        <div class="ov-card-count" id="ov-janela">0</div>
+        <div class="ov-card-desc">erros nas janelas semanais</div>
+      </div>
+      <div class="ov-card conciliacao" onclick="switchTab('dashboard');switchSubDash('conciliacao')">
+        <div class="ov-card-icon">🔄</div>
+        <div class="ov-card-title">Conciliação Semanal</div>
+        <div class="ov-card-count" id="ov-conciliacao">0</div>
+        <div class="ov-card-desc">erros nas conciliações</div>
+      </div>
+      <div class="ov-card outros" onclick="switchTab('dashboard');switchSubDash('outros')">
+        <div class="ov-card-icon">⚡</div>
+        <div class="ov-card-title">Erros do Dia a Dia</div>
+        <div class="ov-card-count" id="ov-outros">0</div>
+        <div class="ov-card-desc">ocorrências avulsas</div>
+      </div>
+    </div>
+
+    <!-- subtabs do dashboard -->
+    <div class="subtab-bar">
+      <button class="subtab-btn active" onclick="switchSubDash('geral')">🌐 Visão Geral</button>
+      <button class="subtab-btn" onclick="switchSubDash('janela')">📋 Janela de Pagamento</button>
+      <button class="subtab-btn" onclick="switchSubDash('conciliacao')">🔄 Conciliação</button>
+      <button class="subtab-btn" onclick="switchSubDash('outros')">⚡ Dia a Dia</button>
+    </div>
+
+    <!-- ── GERAL ── -->
+    <div id="subdash-geral" class="subview active">
+
+      <!-- Comparativo mensal -->
+      <div class="table-card" style="margin-bottom:var(--gap)">
+        <div class="table-header">
+          <div style="font-size:13px;font-weight:600;">Comparativo mensal — erros por categoria</div>
+          <div style="font-size:12px;color:var(--muted)">↑ piora &nbsp;↓ melhora vs mês anterior</div>
+        </div>
+        <div id="tabela-mensal"></div>
+      </div>
+
+      <div class="charts-row-2">
+        <div class="chart-card"><div class="chart-title">Evolução mensal por categoria <span class="badge">tendência</span></div><canvas id="chartGeralTrend"></canvas></div>
+        <div class="chart-card"><div class="chart-title">Por responsável <span class="badge">acumulado</span></div><canvas id="chartGeralResp"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── JANELA ── -->
+    <div id="subdash-janela" class="subview">
+      <div class="section-header">
+        <div class="section-icon janela">📋</div>
+        <div><div class="section-title">Janela de Pagamento Semanal</div><div class="section-sub">Erros detectados durante a conferência semanal antes do envio para aprovação</div></div>
+      </div>
+      <div class="kpi-row-3">
+        <div class="kpi-card danger"><div class="kpi-label">Total de erros</div><div class="kpi-value" id="j-total">0</div><div class="kpi-sub">registros</div></div>
+        <div class="kpi-card warning"><div class="kpi-label">Tipo mais comum</div><div class="kpi-value" style="font-size:16px;font-weight:600;" id="j-top">—</div><div class="kpi-sub" id="j-top-ct">—</div></div>
+        <div class="kpi-card info"><div class="kpi-label">Média por janela</div><div class="kpi-value" id="j-media">0</div><div class="kpi-sub">erros/semana</div></div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card"><div class="chart-title">Erros por janela <span class="badge">tendência</span></div><canvas id="chartJanelaTrend"></canvas></div>
+        <div class="chart-card"><div class="chart-title">Ranking de tipos <span class="badge">top 6</span></div><canvas id="chartJanelaTipo"></canvas></div>
+      </div>
+      <div class="table-card" style="margin-top:0">
+        <div class="table-header"><span style="font-size:13px;font-weight:600;">Detalhe — Janelas</span></div>
+        <div id="tabela-janela"></div>
+      </div>
+    </div>
+
+    <!-- ── CONCILIAÇÃO ── -->
+    <div id="subdash-conciliacao" class="subview">
+      <div class="section-header">
+        <div class="section-icon conciliacao">🔄</div>
+        <div><div class="section-title">Conciliação Semanal</div><div class="section-sub">Erros encontrados na conciliação Qive × Omie × extratos × faturas de cartão</div></div>
+      </div>
+      <div class="kpi-row-3">
+        <div class="kpi-card danger"><div class="kpi-label">Total de erros</div><div class="kpi-value" id="c-total">0</div><div class="kpi-sub">registros</div></div>
+        <div class="kpi-card warning"><div class="kpi-label">Tipo mais comum</div><div class="kpi-value" style="font-size:16px;font-weight:600;" id="c-top">—</div><div class="kpi-sub" id="c-top-ct">—</div></div>
+        <div class="kpi-card info"><div class="kpi-label">Média por semana</div><div class="kpi-value" id="c-media">0</div><div class="kpi-sub">erros/semana</div></div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card"><div class="chart-title">Erros por semana de conciliação <span class="badge green">tendência</span></div><canvas id="chartConcilTrend"></canvas></div>
+        <div class="chart-card"><div class="chart-title">Ranking de tipos <span class="badge green">top 6</span></div><canvas id="chartConcilTipo"></canvas></div>
+      </div>
+      <div class="table-card" style="margin-top:0">
+        <div class="table-header"><span style="font-size:13px;font-weight:600;">Detalhe — Conciliações</span></div>
+        <div id="tabela-conciliacao"></div>
+      </div>
+    </div>
+
+    <!-- ── OUTROS ── -->
+    <div id="subdash-outros" class="subview">
+      <div class="section-header">
+        <div class="section-icon outros">⚡</div>
+        <div><div class="section-title">Erros do Dia a Dia</div><div class="section-sub">Ocorrências avulsas: erros de lançamento, pagamentos rejeitados, perdas de prazo, etc.</div></div>
+      </div>
+      <div class="kpi-row-3">
+        <div class="kpi-card danger"><div class="kpi-label">Total de erros</div><div class="kpi-value" id="o-total">0</div><div class="kpi-sub">registros</div></div>
+        <div class="kpi-card warning"><div class="kpi-label">Com impacto R$</div><div class="kpi-value" id="o-comvalor">0</div><div class="kpi-sub">erros com valor</div></div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card"><div class="chart-title">Erros ao longo do tempo <span class="badge orange">tendência</span></div><canvas id="chartOutrosTrend"></canvas></div>
+        <div class="chart-card"><div class="chart-title">Por tipo</div><canvas id="chartOutrosTipo"></canvas></div>
+      </div>
+      <div class="table-card" style="margin-top:0">
+        <div class="table-header"><span style="font-size:13px;font-weight:600;">Detalhe — Dia a Dia</span></div>
+        <div id="tabela-outros"></div>
+      </div>
+    </div>
+
+  </div><!-- /view-dashboard -->
+
+  <!-- ══════════════════ FORM ══════════════════ -->
+  <div id="view-form" class="view">
+    <div class="form-card">
+      <div class="form-title">Registrar novo erro</div>
+      <div class="form-sub">Dados salvos localmente no navegador.</div>
+
+      <div class="section-label">Classificação principal</div>
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Categoria do erro <span class="req">*</span></label>
+          <select id="f-categoria" onchange="updateTiposForm()">
+            <option value="">Selecionar...</option>
+            <option value="janela">📋 Janela de Pagamento Semanal</option>
+            <option value="conciliacao">🔄 Conciliação Semanal</option>
+            <option value="outros">⚡ Erro do Dia a Dia</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Data de identificação <span class="req">*</span></label>
+          <input type="date" id="f-data">
+        </div>
+        <div class="form-field">
+          <label>Referência / Semana <span class="req">*</span></label>
+          <input type="text" id="f-semana" placeholder="ex: Janela 10/06 ou Conciliação 2ª sem Jun">
+        </div>
+      </div>
+
+      <hr class="divider">
+      <div class="section-label">Detalhes do erro</div>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Tipo de erro <span class="req">*</span></label>
+          <select id="f-tipo"><option value="">Selecione a categoria primeiro</option></select>
+        </div>
+        <div class="form-field">
+          <label>Causa raiz</label>
+          <select id="f-motivo">
+            <option value="">Selecionar...</option>
+            <option>Falta de atenção</option>
+            <option>Falta de checklist</option>
+            <option>Proatividade</option>
+            <option>Erro remessa bancária</option>
+            <option>Atraso / Prazo</option>
+            <option>Lançamentos não encontrados no Omie</option>
+            <option>Não cumpriu prazo da atividade</option>
+            <option>Análise crítica</option>
+            <option>Outro</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Responsável pela atividade <span class="req">*</span></label>
+          <select id="f-responsavel">
+            <option value="">Selecionar...</option>
+            <option>Thaiane</option>
+            <option>Kamilla</option>
+            <option>DP</option>
+            <option>Contabilidade</option>
+            <option>Outro</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Quem identificou</label>
+          <select id="f-identificou">
+            <option value="">Selecionar...</option>
+            <option>Kamilla</option>
+            <option>Thaiane</option>
+            <option>Contabilidade</option>
+            <option>Fornecedor</option>
+            <option>Banco</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Impacto</label>
+          <select id="f-impacto">
+            <option value="">Selecionar...</option>
+            <option>Retrabalho</option>
+            <option>Impacto financeiro</option>
+            <option>Multa / Juros</option>
+            <option>Ruído com outras áreas</option>
+            <option>Pagamento em atraso</option>
+            <option>Atraso em atividades</option>
+            <option>Sem impacto</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Valor impactado (R$)</label>
+          <input type="number" id="f-valor" placeholder="0,00" min="0" step="0.01">
+        </div>
+        <div class="form-field">
+          <label>Resumo <span class="req">*</span></label>
+          <input type="text" id="f-resumo" placeholder="Descrição curta do erro">
+        </div>
+        <div class="form-field">
+          <label>Quantidade de erros <span class="req">*</span></label>
+          <input type="number" id="f-qtd" value="1" min="1" step="1" placeholder="1">
+        </div>
+        <div class="form-field full">
+          <label>Descrição detalhada</label>
+          <textarea id="f-descricao" placeholder="Contexto, o que aconteceu, ação tomada..."></textarea>
+        </div>
+      </div>
+
+      <div>
+        <button class="btn-submit" onclick="salvarErro()">✅ Salvar erro</button>
+        <button class="btn-clear" onclick="limparForm()">Limpar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ LISTA ══════════════════ -->
+  <div id="view-lista" class="view">
+    <div class="subtab-bar">
+      <button class="subtab-btn active" onclick="switchSubLista('todos')">Todos</button>
+      <button class="subtab-btn" onclick="switchSubLista('janela')">📋 Janela</button>
+      <button class="subtab-btn" onclick="switchSubLista('conciliacao')">🔄 Conciliação</button>
+      <button class="subtab-btn" onclick="switchSubLista('outros')">⚡ Dia a Dia</button>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <div style="font-size:13px;font-weight:600;" id="lista-title">Todos os erros</div>
+        <div class="filter-row">
+          <select id="filtro-resp" onchange="renderLista()"><option value="">Todos responsáveis</option><option>Thaiane</option><option>Kamilla</option><option>DP</option><option>Contabilidade</option></select>
+          <select id="filtro-tipo-lista" onchange="renderLista()"><option value="">Todos os tipos</option></select>
+          <button onclick="exportCSV()" style="padding:6px 14px;background:var(--purple-mid);color:#fff;border:none;border-radius:6px;font-family:Poppins,sans-serif;font-size:12px;cursor:pointer;">⬇ CSV</button>
+          <button onclick="limparTodos()" style="padding:6px 14px;background:transparent;color:var(--danger);border:1px solid var(--danger);border-radius:6px;font-family:Poppins,sans-serif;font-size:12px;cursor:pointer;">🗑 Limpar tudo</button>
+        </div>
+      </div>
+      <div id="tabela-lista-wrap"></div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<div id="modal-usuario" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-title">Quem é você?</div>
+    <div class="modal-sub">Selecione seu nome para dar ciência nos seus erros.</div>
+    <div class="modal-btns">
+      <button class="modal-btn kamilla" onclick="definirUsuario('Kamilla')">Kamilla</button>
+      <button class="modal-btn thaiane" onclick="definirUsuario('Thaiane')">Thaiane</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">✅ Erro registrado com sucesso!</div>
+
+<script>
+// ── TIPOS POR CATEGORIA ───────────────────────────────────────────────────
+const TIPOS = {
+  janela: [
+    'Falta de dados bancários',
+    'Erro CC (centro de custo)',
+    'Erro categoria',
+    'Erro valor / anexo',
+    'Erro doc no drive',
+    'Tipo de doc não preenchido',
+    'Sem solicitante',
+    'Sem fórmula',
+    'Boleto vencido',
+    'Remessa não bateu',
+    'Formatação da planilha',
+    'Falta de validação com gestor',
+    'Falta de valores do DP',
+    'Resumo não bateu',
+    'Retenção de imposto',
+    'Outro',
+  ],
+  conciliacao: [
+    'Erro CC (centro de custo)',
+    'Erro categoria',
+    'Saldo de cartão não batendo',
+    'Swile não batendo',
+    'Tipo de doc não preenchido',
+    'Falta de descrição no lançamento',
+    'Sem solicitante',
+    'Erro de lançamento sem imposto',
+    'Sem anexo',
+    'Extrato não enviado',
+    'Outro',
+  ],
+  outros: [
+    'Erro de lançamento',
+    'Falta de lançamento no Omie',
+    'Pagamento rejeitado banco',
+    'Perda de prazo',
+    'Pagamento duplicado',
+    'Retenção de imposto',
+    'Pagamento sem pipe aberto',
+    'Falta de cadastro de pagamento',
+    'Conflito com outra área',
+    'Home office sem aviso',
+    'Atraso em prazo interno',
+    'Erro triagem e-mail',
+    'Outro',
+  ],
+};
+
+function updateTiposForm() {
+  const cat = document.getElementById('f-categoria').value;
+  const sel = document.getElementById('f-tipo');
+  sel.innerHTML = '<option value="">Selecionar...</option>';
+  if (cat && TIPOS[cat]) TIPOS[cat].forEach(t => { const o = document.createElement('option'); o.value = t; o.text = t; sel.appendChild(o); });
+}
+
+// ── STORAGE ───────────────────────────────────────────────────────────────
+const KEY = 'cp_erros_v4';
+function loadData() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } }
+function saveData(arr) { localStorage.setItem(KEY, JSON.stringify(arr)); }
+
+function byCategoria(cat) { return loadData().filter(r => r.categoria === cat); }
+
+// ── SEED ──────────────────────────────────────────────────────────────────
+function seedIfEmpty() {
+  ['cp_erros_v1','cp_erros_v2','cp_erros_v3'].forEach(k=>localStorage.removeItem(k));
+  if (loadData().length > 0) return;
+  const seed = [
+    // ── JANELAS ─────────────────────────────────────────────────────────
+    // Janela 01/04 — 21 erros
+    {id:1,data:'2026-04-01',semana:'Janela 01/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de dados bancários',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:4,resumo:'Falta de dados bancários',descricao:''},
+    {id:2,data:'2026-04-01',semana:'Janela 01/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro categoria',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Erro categoria',descricao:''},
+    {id:3,data:'2026-04-01',semana:'Janela 01/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro CC (centro de custo)',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:4,resumo:'Erro CC',descricao:''},
+    {id:4,data:'2026-04-01',semana:'Janela 01/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Sem solicitante',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Falta de informação no pagamento',descricao:''},
+    {id:5,data:'2026-04-01',semana:'Janela 01/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro valor / anexo',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:4,resumo:'Erro no valor anexo x planilha',descricao:''},
+    {id:6,data:'2026-04-01',semana:'Janela 01/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro doc no drive',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:6,resumo:'Erro doc no drive',descricao:''},
+    {id:7,data:'2026-04-01',semana:'Janela 01/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Sem fórmula',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Faltou fórmula',descricao:''},
+    // Janela 08/04 — 25 erros
+    {id:8,data:'2026-04-08',semana:'Janela 08/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Sem solicitante',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:3,resumo:'Solicitante não informado',descricao:''},
+    {id:9,data:'2026-04-08',semana:'Janela 08/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de dados bancários',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:2,resumo:'Falta de dados bancários',descricao:''},
+    {id:10,data:'2026-04-08',semana:'Janela 08/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Formatação da planilha',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Fontes diferentes na planilha',descricao:''},
+    {id:11,data:'2026-04-08',semana:'Janela 08/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de valores do DP',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:2,resumo:'Falta de valores do DP',descricao:''},
+    {id:12,data:'2026-04-08',semana:'Janela 08/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro valor / anexo',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:6,resumo:'Erro no valor anexo x planilha',descricao:''},
+    {id:13,data:'2026-04-08',semana:'Janela 08/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro doc no drive',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:6,resumo:'Erro doc no drive',descricao:''},
+    {id:14,data:'2026-04-08',semana:'Janela 08/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro de lançamento',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:4,resumo:'Erro lançamento',descricao:''},
+    {id:15,data:'2026-04-08',semana:'Janela 08/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro categoria',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Erro categoria',descricao:''},
+    // Janela 15/04 — 16 erros
+    {id:16,data:'2026-04-10',semana:'Janela 15/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de validação com gestor',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:2,resumo:'Validação de pgtos com gestores',descricao:''},
+    {id:17,data:'2026-04-10',semana:'Janela 15/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de dados bancários',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:5,resumo:'Falta de dados bancários',descricao:''},
+    {id:18,data:'2026-04-10',semana:'Janela 15/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro CC (centro de custo)',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:2,resumo:'Erro CC',descricao:''},
+    {id:19,data:'2026-04-10',semana:'Janela 15/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro categoria',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:3,resumo:'Erro categoria',descricao:''},
+    {id:20,data:'2026-04-10',semana:'Janela 15/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro doc no drive',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:3,resumo:'Erro doc no drive',descricao:''},
+    {id:21,data:'2026-04-10',semana:'Janela 15/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Remessa não bateu',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Remessa não bateu',descricao:''},
+    // Janela 22/04 — 13 erros
+    {id:22,data:'2026-04-20',semana:'Janela 22/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de dados bancários',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Falta de dados bancários',descricao:''},
+    {id:23,data:'2026-04-20',semana:'Janela 22/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro CC (centro de custo)',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:6,resumo:'Erro CC',descricao:''},
+    {id:24,data:'2026-04-20',semana:'Janela 22/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro categoria',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Erro categoria',descricao:''},
+    {id:25,data:'2026-04-20',semana:'Janela 22/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro doc no drive',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Erro doc no drive',descricao:''},
+    {id:26,data:'2026-04-20',semana:'Janela 22/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Boleto vencido',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:4,resumo:'Boleto vencido',descricao:''},
+    // Janela 29/04 — 13 erros
+    {id:27,data:'2026-04-27',semana:'Janela 29/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de dados bancários',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:3,resumo:'Falta de dados bancários',descricao:''},
+    {id:28,data:'2026-04-27',semana:'Janela 29/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro valor / anexo',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:2,resumo:'Erro valor',descricao:''},
+    {id:29,data:'2026-04-27',semana:'Janela 29/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro doc no drive',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:3,resumo:'Erro doc no drive',descricao:''},
+    {id:30,data:'2026-04-27',semana:'Janela 29/04',categoria:'janela',responsavel:'DP',identificou:'Kamilla',tipo:'Falta de validação com gestor',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Sem validação MKT/Compras',descricao:''},
+    {id:31,data:'2026-04-27',semana:'Janela 29/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Sem fórmula',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:3,resumo:'Previsões',descricao:''},
+    {id:32,data:'2026-04-27',semana:'Janela 29/04',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Remessa não bateu',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Resumo não bateu',descricao:''},
+    // Janela 06/05 — 15 erros
+    {id:33,data:'2026-05-07',semana:'Janela 06/05',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de dados bancários',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:5,resumo:'Falta de dados bancários',descricao:''},
+    {id:34,data:'2026-05-07',semana:'Janela 06/05',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro valor / anexo',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:2,resumo:'Erro valor',descricao:''},
+    {id:35,data:'2026-05-07',semana:'Janela 06/05',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro doc no drive',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:4,resumo:'Erro doc no drive',descricao:''},
+    {id:36,data:'2026-05-07',semana:'Janela 06/05',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Sem solicitante',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:3,resumo:'Sem solicitante',descricao:''},
+    {id:37,data:'2026-05-07',semana:'Janela 06/05',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Sem descrição',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Sem descrição',descricao:''},
+    // Janela 13/05 — 11 erros (janela) + conciliação separada
+    {id:38,data:'2026-05-12',semana:'Janela 13/05',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de dados bancários',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:2,resumo:'Falta de dados bancários',descricao:''},
+    {id:39,data:'2026-05-12',semana:'Janela 13/05',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro doc no drive',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:5,resumo:'Erro doc no drive',descricao:''},
+    {id:40,data:'2026-05-12',semana:'Janela 13/05',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro de lançamento',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:4,resumo:'Erro lançamento',descricao:''},
+    // Janela 20/05 — 11 erros
+    {id:41,data:'2026-05-18',semana:'Janela 20/05',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de dados bancários',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Falta de dados bancários',descricao:''},
+    {id:42,data:'2026-05-18',semana:'Janela 20/05',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro doc no drive',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:10,resumo:'Erro doc no drive',descricao:''},
+    
+    // Janela 10/06 — 11 erros
+    {id:44,data:'2026-06-08',semana:'Janela 10/06',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Sem solicitante',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:2,resumo:'Erro solicitante',descricao:''},
+    {id:45,data:'2026-06-08',semana:'Janela 10/06',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Sem fórmula',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Sem fórmula',descricao:''},
+    {id:46,data:'2026-06-08',semana:'Janela 10/06',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro doc no drive',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:5,resumo:'Erro doc no drive',descricao:''},
+    {id:47,data:'2026-06-08',semana:'Janela 10/06',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro valor / anexo',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Erro lançamento valor',descricao:''},
+    {id:48,data:'2026-06-08',semana:'Janela 10/06',categoria:'janela',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Retenção de imposto',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:2,resumo:'Erro retenção de imposto',descricao:''},
+    // Sem fórmula já contado acima (total = 2+1+2+1+2+3 = 11) ✓
+
+    // ── CONCILIAÇÕES ─────────────────────────────────────────────────────
+    // Conciliação 1ª-2ª sem Abril
+    {id:49,data:'2026-04-14',semana:'Conciliação 1ª-2ª sem Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro CC (centro de custo)',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:3,resumo:'Erro CC',descricao:''},
+    {id:50,data:'2026-04-14',semana:'Conciliação 1ª-2ª sem Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro categoria',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:3,resumo:'Erro categoria',descricao:''},
+    {id:51,data:'2026-04-14',semana:'Conciliação 1ª-2ª sem Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Saldo de cartão não batendo',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:3,resumo:'Saldo de cartão não batendo',descricao:''},
+    // Conciliação 3ª sem Abril — 217 erros
+    {id:52,data:'2026-04-27',semana:'Conciliação 3ª sem Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro CC (centro de custo)',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:16,resumo:'Erro CC',descricao:''},
+    {id:53,data:'2026-04-27',semana:'Conciliação 3ª sem Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro categoria',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:2,resumo:'Erro categoria',descricao:''},
+    {id:54,data:'2026-04-27',semana:'Conciliação 3ª sem Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Saldo de cartão não batendo',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:5,resumo:'Saldo de cartão não batendo',descricao:''},
+    {id:55,data:'2026-04-27',semana:'Conciliação 3ª sem Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Swile não batendo',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Swile não batendo',descricao:''},
+    {id:56,data:'2026-04-27',semana:'Conciliação 3ª sem Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Tipo de doc não preenchido',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:193,resumo:'Tipo de doc não preenchido',descricao:''},
+    // Conciliação Fechamento Abril — 325 erros
+    {id:57,data:'2026-05-04',semana:'Conciliação Fechamento Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro CC (centro de custo)',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:6,resumo:'Erro CC',descricao:''},
+    {id:58,data:'2026-05-04',semana:'Conciliação Fechamento Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro categoria',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Erro categoria',descricao:''},
+    {id:59,data:'2026-05-04',semana:'Conciliação Fechamento Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Saldo de cartão não batendo',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:6,resumo:'Saldo de cartão não batendo',descricao:''},
+    {id:60,data:'2026-05-04',semana:'Conciliação Fechamento Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Swile não batendo',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:2,resumo:'Swile não batendo',descricao:''},
+    {id:61,data:'2026-05-04',semana:'Conciliação Fechamento Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Tipo de doc não preenchido',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:309,resumo:'Tipo de doc não preenchido',descricao:''},
+    {id:62,data:'2026-05-04',semana:'Conciliação Fechamento Abril',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de descrição no lançamento',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Falta de descrição lançamento',descricao:''},
+    // Conciliação semana 13/05 (junto com janela)
+    {id:63,data:'2026-05-12',semana:'Conciliação 2ª sem Maio',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro CC (centro de custo)',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:7,resumo:'Erro CC',descricao:''},
+    {id:64,data:'2026-05-12',semana:'Conciliação 2ª sem Maio',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro categoria',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Erro categoria',descricao:''},
+    {id:65,data:'2026-05-12',semana:'Conciliação 2ª sem Maio',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Tipo de doc não preenchido',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:24,resumo:'Tipo de doc não preenchido',descricao:''},
+    // Conciliação 3ª sem Maio
+    {id:66,data:'2026-05-19',semana:'Conciliação 3ª sem Maio',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro CC (centro de custo)',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Erro CC',descricao:''},
+    {id:67,data:'2026-05-19',semana:'Conciliação 3ª sem Maio',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Saldo de cartão não batendo',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:4,resumo:'Saldo de cartão não batendo',descricao:''},
+    {id:68,data:'2026-05-19',semana:'Conciliação 3ª sem Maio',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Tipo de doc não preenchido',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:4,resumo:'Tipo de doc não preenchido',descricao:''},
+    // Conciliação 1ª sem Junho — 366 erros
+    {id:69,data:'2026-06-10',semana:'Conciliação 1ª sem Junho',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro categoria',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Erro de categoria',descricao:''},
+    {id:70,data:'2026-06-10',semana:'Conciliação 1ª sem Junho',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro CC (centro de custo)',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:16,resumo:'Departamento incorreto',descricao:''},
+    {id:71,data:'2026-06-10',semana:'Conciliação 1ª sem Junho',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Tipo de doc não preenchido',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:53,resumo:'Tipo de documento não preenchido',descricao:''},
+    {id:72,data:'2026-06-10',semana:'Conciliação 1ª sem Junho',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Erro de lançamento sem imposto',motivo:'Falta de atenção',impacto:'Impacto financeiro',valor:0,qtd:1,resumo:'Erro de lançamento sem imposto',descricao:''},
+    {id:73,data:'2026-06-10',semana:'Conciliação 1ª sem Junho',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Sem solicitante',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:105,resumo:'Solicitante de pagamentos não preenchido',descricao:''},
+    {id:74,data:'2026-06-10',semana:'Conciliação 1ª sem Junho',categoria:'conciliacao',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Sem anexo',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:190,resumo:'Sem anexo',descricao:'Extra'},
+
+    // ── OUTROS ───────────────────────────────────────────────────────────
+    {id:75,data:'2026-04-09',semana:'Abril',categoria:'outros',responsavel:'Thaiane',identificou:'Fornecedor',tipo:'Retenção de imposto',motivo:'Falta de atenção',impacto:'Impacto financeiro',valor:2275.50,qtd:1,resumo:'NF 00317 APIPASS lançada sem retenção — devolução R$2.275,50',descricao:''},
+    {id:76,data:'2026-04-07',semana:'Abril',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Perda de prazo',motivo:'Falta de checklist',impacto:'Multa / Juros',valor:0,qtd:1,resumo:'Cartão venc 05/04 pago em 08/04',descricao:''},
+    {id:77,data:'2026-04-09',semana:'Abril',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Pagamento rejeitado banco',motivo:'Falta de atenção',impacto:'Pagamento em atraso',valor:35632.14,qtd:1,resumo:'Dados bancários inconsistentes — pagamento duplo devolvido 2x',descricao:''},
+    {id:78,data:'2026-04-13',semana:'Abril',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Retenção de imposto',motivo:'Falta de checklist',impacto:'Impacto financeiro',valor:2191.37,qtd:1,resumo:'Fatura sem retenção identificada antes do pagamento',descricao:''},
+    {id:79,data:'2026-04-14',semana:'Abril',categoria:'outros',responsavel:'Kamilla',identificou:'Kamilla',tipo:'Falta de cadastro de pagamento',motivo:'Falta de checklist',impacto:'Retrabalho',valor:1795.40,qtd:1,resumo:'Arquivo de férias UX não saiu do banco',descricao:''},
+    {id:80,data:'2026-04-17',semana:'Abril',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Atraso em prazo interno',motivo:'Não cumpriu prazo da atividade',impacto:'Atraso em atividades',valor:0,qtd:1,resumo:'Comprovantes de pagamento de Março não estão no drive — quase 1 mês de atraso',descricao:''},
+    {id:81,data:'2026-04-17',semana:'Abril',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Atraso em prazo interno',motivo:'Não cumpriu prazo da atividade',impacto:'Ruído com outras áreas',valor:0,qtd:1,resumo:'Base de compras de Março não atualizada até dia 10',descricao:''},
+    {id:82,data:'2026-04-20',semana:'Abril',categoria:'outros',responsavel:'Kamilla',identificou:'Thaiane',tipo:'Pagamento rejeitado banco',motivo:'Erro remessa bancária',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Pagamento rejeitado não sinalizado na planilha — ficou em aberto no Omie',descricao:''},
+    {id:83,data:'2026-04-22',semana:'Abril',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Boleto vencido',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Boleto Swile venc 19/03 enviado para pagamento dia 22/04',descricao:''},
+    {id:84,data:'2026-04-22',semana:'Abril',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Conflito com outra área',motivo:'Falta de checklist',impacto:'Ruído com outras áreas',valor:0,qtd:1,resumo:'Card da Bruna no CC de CS — cada área deve alocar apenas seu departamento',descricao:''},
+    {id:85,data:'2026-04-27',semana:'Abril',categoria:'outros',responsavel:'DP',identificou:'Kamilla',tipo:'Atraso em prazo interno',motivo:'Atraso / Prazo',impacto:'Pagamento em atraso',valor:0,qtd:1,resumo:'DP não enviou valores até sexta',descricao:''},
+    {id:86,data:'2026-04-30',semana:'Abril',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de lançamento no Omie',motivo:'Proatividade',impacto:'Retrabalho',valor:0,qtd:3,resumo:'Pagamentos não lançados no Omie antes da baixa',descricao:''},
+    {id:87,data:'2026-05-04',semana:'Maio',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de lançamento no Omie',motivo:'Proatividade',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Pagamento não lançado antes da baixa',descricao:''},
+    {id:88,data:'2026-05-06',semana:'Maio',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Conflito com outra área',motivo:'Falta de atenção',impacto:'Ruído com outras áreas',valor:0,qtd:1,resumo:'Clima ruim com Bruna no Slack — Adriano colocado no grupo',descricao:''},
+    {id:89,data:'2026-05-06',semana:'Maio',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Remessa não bateu',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Remessa não bateu',descricao:''},
+    {id:90,data:'2026-05-11',semana:'Maio',categoria:'outros',responsavel:'Kamilla',identificou:'Kamilla',tipo:'Perda de prazo',motivo:'Falta de atenção',impacto:'Impacto financeiro',valor:6475.90,qtd:1,resumo:'Aplicação vencia 06/05, anotou 05/06 — perdeu 5 dias de rendimento',descricao:''},
+    {id:91,data:'2026-05-14',semana:'Maio',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de lançamento no Omie',motivo:'Lançamentos não encontrados no Omie',impacto:'Atraso em atividades',valor:0,qtd:5,resumo:'Atraso lançamento Omie — 5 pagamentos',descricao:''},
+    {id:92,data:'2026-05-18',semana:'Maio',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Atraso em prazo interno',motivo:'Atraso / Prazo',impacto:'Atraso em atividades',valor:0,qtd:1,resumo:'PDI na Qulture entregue 18/05, prazo era 15/05',descricao:''},
+    {id:93,data:'2026-05-18',semana:'Maio',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Home office sem aviso',motivo:'Falta de atenção',impacto:'Sem impacto',valor:0,qtd:1,resumo:'Home office sem aviso para Kamilla e possivelmente para Adriano',descricao:''},
+    {id:94,data:'2026-05-19',semana:'Maio',categoria:'outros',responsavel:'Thaiane',identificou:'Contabilidade',tipo:'Erro de lançamento',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Campo NF no Omie preenchido com CNPJ do fornecedor',descricao:''},
+    {id:95,data:'2026-05-20',semana:'Maio',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Pagamento sem pipe aberto',motivo:'Falta de checklist',impacto:'Retrabalho',valor:0,qtd:1,resumo:'HH paga por e-mail sem pipe — foge da regra',descricao:''},
+    {id:96,data:'2026-05-20',semana:'Maio',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de lançamento no Omie',motivo:'Lançamentos não encontrados no Omie',impacto:'Retrabalho',valor:0,qtd:13,resumo:'13 lançamentos não efetuados no Omie no dia da baixa',descricao:''},
+    {id:97,data:'2026-05-21',semana:'Maio',categoria:'outros',responsavel:'Kamilla',identificou:'Kamilla',tipo:'Falta de lançamento no Omie',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Leverpro residual do ano passado ficou em aberto — NF recebida não subiu para pagamento',descricao:''},
+  ];
+  saveData(seed);
+}
+
+// ── CHARTS ────────────────────────────────────────────────────────────────
+const charts = {};
+const COLORS = ['#6613D0','#FE8F1C','#1FAC66','#1DA6AE','#C70404','#8E44ED','#C99D02','#2D085D','#0B0D19','#E2D0FA'];
+
+function weekKey(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr+'T00:00:00');
+  const day = d.getDay(), diff = d.getDate()-day+(day===0?-6:1);
+  const mon = new Date(d); mon.setDate(diff);
+  return `${String(mon.getDate()).padStart(2,'0')}/${String(mon.getMonth()+1).padStart(2,'0')}`;
+}
+
+function topEntry(arr, field) {
+  const m={};
+  arr.forEach(r=>{if(r[field])m[r[field]]=(m[r[field]]||0)+1;});
+  return Object.entries(m).sort((a,b)=>b[1]-a[1])[0]||null;
+}
+function topEntryQtd(arr, field) {
+  const m={};
+  arr.forEach(r=>{if(r[field])m[r[field]]=(m[r[field]]||0)+(r.qtd||1);});
+  return Object.entries(m).sort((a,b)=>b[1]-a[1])[0]||null;
+}
+
+function makeBar(id, labels, values, color, horizontal=false) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
+    type:'bar',
+    data:{labels,datasets:[{data:values,backgroundColor:color+'40',borderColor:color,borderWidth:2,borderRadius:5}]},
+    options:{indexAxis:horizontal?'y':'x',responsive:true,plugins:{legend:{display:false}},scales:{[horizontal?'x':'y']:{beginAtZero:true,ticks:{stepSize:1}}}}
+  });
+}
+function makeBarTrend(id,labels,values,color) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
+    type:'bar',
+    data:{labels,datasets:[
+      {type:'bar',data:values,backgroundColor:color+'30',borderColor:color,borderWidth:2,borderRadius:5},
+      {type:'line',data:values,borderColor:'#FE8F1C',backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:0.4}
+    ]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}
+  });
+}
+function makeDoughnut(id,labels,values) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
+    type:'doughnut',
+    data:{labels,datasets:[{data:values,backgroundColor:COLORS,borderWidth:0}]},
+    options:{responsive:true,cutout:'62%',plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}}
+  });
+}
+
+const sumQtd = arr => arr.reduce((a,r) => a + (r.qtd||1), 0);
+
+function renderDashboard() {
+  const all = loadData();
+  const jan = all.filter(r=>r.categoria==='janela');
+  const con = all.filter(r=>r.categoria==='conciliacao');
+  const out = all.filter(r=>r.categoria==='outros');
+
+  // Overview counts
+  document.getElementById('ov-janela').textContent = sumQtd(jan);
+  document.getElementById('ov-conciliacao').textContent = sumQtd(con);
+  document.getElementById('ov-outros').textContent = sumQtd(out);
+
+  // ── GERAL ──
+  const MESES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  // Agrupa por mês × categoria
+  const mMap={}; // {mesKey: {janela,conciliacao,outros,total}}
+  all.forEach(r=>{
+    if(!r.data)return;
+    const[y,m]=r.data.split('-');
+    const k=MESES[parseInt(m,10)-1]+'/'+y.slice(2);
+    const q=r.qtd||1;
+    if(!mMap[k])mMap[k]={janela:0,conciliacao:0,outros:0,total:0};
+    mMap[k][r.categoria]=(mMap[k][r.categoria]||0)+q;
+    mMap[k].total+=q;
+  });
+  const mSorted=Object.keys(mMap).sort((a,b)=>{
+    const pa=a.split('/'),pb=b.split('/');
+    return pa[1]!==pb[1]?pa[1]-pb[1]:MESES.indexOf(pa[0])-MESES.indexOf(pb[0]);
+  });
+
+  // Tabela comparativa mensal
+  function varBadge(curr,prev){
+    if(prev==null)return'<span style="color:var(--muted);font-size:11px">—</span>';
+    const d=curr-prev;
+    if(d===0)return'<span style="color:var(--muted);font-size:11px">= 0</span>';
+    const cls=d>0?'color:var(--danger)':'color:var(--success)';
+    const arrow=d>0?'↑':'↓';
+    return`<span style="${cls};font-size:11px;font-weight:600">${arrow} ${Math.abs(d)}</span>`;
+  }
+  const tabelaEl=document.getElementById('tabela-mensal');
+  let tHtml=`<table>
+    <thead><tr>
+      <th>Mês</th>
+      <th style="color:var(--purple-mid)">📋 Janela</th><th style="font-size:10px;color:var(--muted)">var.</th>
+      <th style="color:var(--success)">🔄 Conciliação</th><th style="font-size:10px;color:var(--muted)">var.</th>
+      <th style="color:var(--orange)">⚡ Dia a Dia</th><th style="font-size:10px;color:var(--muted)">var.</th>
+      <th>Total</th><th style="font-size:10px;color:var(--muted)">var.</th>
+    </tr></thead><tbody>`;
+  mSorted.forEach((k,i)=>{
+    const cur=mMap[k], prev=i>0?mMap[mSorted[i-1]]:null;
+    const isLast=i===mSorted.length-1;
+    tHtml+=`<tr style="${isLast?'background:#F8F6FF;font-weight:600':''}">
+      <td style="font-weight:600;white-space:nowrap">${k}</td>
+      <td style="text-align:center">${cur.janela||0}</td><td style="text-align:center">${varBadge(cur.janela||0,prev?prev.janela||0:null)}</td>
+      <td style="text-align:center">${cur.conciliacao||0}</td><td style="text-align:center">${varBadge(cur.conciliacao||0,prev?prev.conciliacao||0:null)}</td>
+      <td style="text-align:center">${cur.outros||0}</td><td style="text-align:center">${varBadge(cur.outros||0,prev?prev.outros||0:null)}</td>
+      <td style="text-align:center;font-weight:600">${cur.total}</td><td style="text-align:center">${varBadge(cur.total,prev?prev.total:null)}</td>
+    </tr>`;
+  });
+  tHtml+='</tbody></table>';
+  tabelaEl.innerHTML=tHtml;
+
+  // Gráfico evolução mensal por categoria (stacked bar)
+  if(charts['chartGeralTrend'])charts['chartGeralTrend'].destroy();
+  charts['chartGeralTrend']=new Chart(document.getElementById('chartGeralTrend').getContext('2d'),{
+    type:'bar',
+    data:{
+      labels:mSorted,
+      datasets:[
+        {label:'Janela',data:mSorted.map(k=>mMap[k].janela||0),backgroundColor:'#6613D060',borderColor:'#6613D0',borderWidth:2,borderRadius:4},
+        {label:'Conciliação',data:mSorted.map(k=>mMap[k].conciliacao||0),backgroundColor:'#1FAC6660',borderColor:'#1FAC66',borderWidth:2,borderRadius:4},
+        {label:'Dia a Dia',data:mSorted.map(k=>mMap[k].outros||0),backgroundColor:'#FE8F1C60',borderColor:'#FE8F1C',borderWidth:2,borderRadius:4},
+      ]
+    },
+    options:{responsive:true,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{stepSize:5}}},plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}}
+  });
+
+  const respAll={'Kamilla':0,'Thaiane':0};
+  all.forEach(r=>{const q=r.qtd||1;if(r.responsavel==='Kamilla')respAll.Kamilla+=q;else if(r.responsavel==='Thaiane')respAll.Thaiane+=q;});
+  makeDoughnut('chartGeralResp',['Kamilla','Thaiane'],[respAll.Kamilla,respAll.Thaiane]);
+
+  // ── JANELA ──
+  document.getElementById('j-total').textContent = sumQtd(jan);
+  const topJ = topEntryQtd(jan,'tipo');
+  if(topJ){document.getElementById('j-top').textContent=topJ[0].length>18?topJ[0].slice(0,16)+'…':topJ[0];document.getElementById('j-top-ct').textContent=topJ[1]+' ocorrências';}
+  const semJanMap={};jan.forEach(r=>{const w=r.semana||weekKey(r.data);semJanMap[w]=(semJanMap[w]||0)+(r.qtd||1);});
+  const semJanKeys=Object.keys(semJanMap);
+  document.getElementById('j-media').textContent = semJanKeys.length ? (sumQtd(jan)/semJanKeys.length).toFixed(1) : '0';
+  makeBarTrend('chartJanelaTrend',semJanKeys,semJanKeys.map(k=>semJanMap[k]),'#6613D0');
+  const tipoJ={};jan.forEach(r=>{if(r.tipo)tipoJ[r.tipo]=(tipoJ[r.tipo]||0)+(r.qtd||1);});
+  const topJ6=Object.entries(tipoJ).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  makeBar('chartJanelaTipo',topJ6.map(t=>t[0]),topJ6.map(t=>t[1]),'#6613D0',true);
+  renderMiniTabela('tabela-janela',jan);
+
+  // ── CONCILIAÇÃO ──
+  document.getElementById('c-total').textContent = sumQtd(con);
+  const topC = topEntryQtd(con,'tipo');
+  if(topC){document.getElementById('c-top').textContent=topC[0].length>18?topC[0].slice(0,16)+'…':topC[0];document.getElementById('c-top-ct').textContent=topC[1]+' ocorrências';}
+  const semCMap={};con.forEach(r=>{const w=r.semana||weekKey(r.data);semCMap[w]=(semCMap[w]||0)+(r.qtd||1);});
+  const semCKeys=Object.keys(semCMap);
+  document.getElementById('c-media').textContent = semCKeys.length ? (sumQtd(con)/semCKeys.length).toFixed(1) : '0';
+  makeBarTrend('chartConcilTrend',semCKeys,semCKeys.map(k=>semCMap[k]),'#1FAC66');
+  const tipoC={};con.forEach(r=>{if(r.tipo)tipoC[r.tipo]=(tipoC[r.tipo]||0)+(r.qtd||1);});
+  const topC6=Object.entries(tipoC).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  makeBar('chartConcilTipo',topC6.map(t=>t[0]),topC6.map(t=>t[1]),'#1FAC66',true);
+  renderMiniTabela('tabela-conciliacao',con);
+
+  // ── OUTROS ──
+  document.getElementById('o-total').textContent = sumQtd(out);
+  const totalValOut = out.reduce((a,r)=>a+(parseFloat(r.valor)||0),0);
+  if(document.getElementById('o-valor'))document.getElementById('o-valor').textContent = totalValOut>0?'R$'+totalValOut.toLocaleString('pt-BR',{minimumFractionDigits:0}):'R$0';
+  document.getElementById('o-comvalor').textContent = out.filter(r=>r.valor>0).length;
+  const wkOut={};out.forEach(r=>{const w=weekKey(r.data);wkOut[w]=(wkOut[w]||0)+(r.qtd||1);});
+  const wkOutKeys=Object.keys(wkOut).sort();
+  makeBarTrend('chartOutrosTrend',wkOutKeys,wkOutKeys.map(k=>wkOut[k]),'#FE8F1C');
+  const tipoO={};out.forEach(r=>{if(r.tipo)tipoO[r.tipo]=(tipoO[r.tipo]||0)+(r.qtd||1);});
+  const topO6=Object.entries(tipoO).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  makeBar('chartOutrosTipo',topO6.map(t=>t[0]),topO6.map(t=>t[1]),'#FE8F1C',true);
+  renderMiniTabela('tabela-outros',out);
+}
+
+// ── MINI TABELA ──────────────────────────────────────────────────────────
+function renderMiniTabela(id, data) {
+  const el = document.getElementById(id);
+  const sorted = [...data].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  if(!sorted.length){el.innerHTML='<div class="empty-state"><div class="icon">📭</div><div>Sem registros.</div></div>';return;}
+  el.innerHTML=`<table><thead><tr><th>Data</th><th>Referência</th><th>Responsável</th><th>Tipo</th><th>Impacto</th><th>Valor</th><th>Resumo</th><th>Ciência</th><th></th></tr></thead>
+  <tbody>${sorted.map(r=>`<tr>
+    <td style="white-space:nowrap">${fmtDate(r.data)}</td>
+    <td style="white-space:nowrap;font-size:11px;color:var(--muted)">${r.semana||'—'}</td>
+    <td><span class="pill ${respClass(r.responsavel)}">${r.responsavel||'—'}</span></td>
+    <td style="max-width:160px;font-size:11px">${r.tipo||'—'}</td>
+    <td><span class="pill ${impClass(r.impacto)}">${r.impacto||'—'}</span></td>
+    <td style="white-space:nowrap;color:${r.valor>0?'var(--danger)':'var(--muted)'};font-size:11px">${r.valor>0?'R$'+parseFloat(r.valor).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}</td>
+    <td style="max-width:200px;font-size:11px">${r.resumo||'—'}${r.qtd>1?' <span style="color:var(--muted);font-weight:600">(×'+r.qtd+')</span>':''}</td>
+    <td>${cienciaCell(r)}</td>
+    <td><button onclick="deletar(${r.id})" style="background:none;border:none;cursor:pointer;color:var(--muted)" title="Excluir">🗑</button></td>
+  </tr>`).join('')}</tbody></table>`;
+}
+
+// ── LISTA ────────────────────────────────────────────────────────────────
+let listaFiltroCategoria = '';
+function switchSubLista(cat) {
+  listaFiltroCategoria = cat==='todos' ? '' : cat;
+  document.querySelectorAll('#view-lista .subtab-btn').forEach((b,i)=>{b.classList.toggle('active',['todos','janela','conciliacao','outros'][i]===cat);});
+  const titles = {todos:'Todos os erros','janela':'📋 Janela de Pagamento','conciliacao':'🔄 Conciliação Semanal','outros':'⚡ Erros do Dia a Dia'};
+  document.getElementById('lista-title').textContent = titles[cat]||'Todos os erros';
+  // rebuild tipo filter
+  const data = listaFiltroCategoria ? loadData().filter(r=>r.categoria===listaFiltroCategoria) : loadData();
+  const tipos = [...new Set(data.map(r=>r.tipo).filter(Boolean))].sort();
+  const sel = document.getElementById('filtro-tipo-lista');
+  sel.innerHTML = '<option value="">Todos os tipos</option>';
+  tipos.forEach(t=>{const o=document.createElement('option');o.value=t;o.text=t;sel.appendChild(o);});
+  renderLista();
+}
+
+function renderLista() {
+  const filtroResp = document.getElementById('filtro-resp').value;
+  const filtroTipo = document.getElementById('filtro-tipo-lista').value;
+  let data = loadData();
+  if (listaFiltroCategoria) data = data.filter(r=>r.categoria===listaFiltroCategoria);
+  if (filtroResp) data = data.filter(r=>r.responsavel===filtroResp);
+  if (filtroTipo) data = data.filter(r=>r.tipo===filtroTipo);
+  data = data.sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  renderMiniTabela('tabela-lista-wrap', data);
+}
+
+// ── FORM ─────────────────────────────────────────────────────────────────
+function salvarErro() {
+  const data = loadData();
+  const novoId = data.length ? Math.max(...data.map(r=>r.id))+1 : 1;
+  const f = {
+    id:novoId,
+    categoria:document.getElementById('f-categoria').value,
+    data:document.getElementById('f-data').value,
+    semana:document.getElementById('f-semana').value.trim(),
+    responsavel:document.getElementById('f-responsavel').value,
+    identificou:document.getElementById('f-identificou').value,
+    tipo:document.getElementById('f-tipo').value,
+    motivo:document.getElementById('f-motivo').value,
+    impacto:document.getElementById('f-impacto').value,
+    valor:parseFloat(document.getElementById('f-valor').value)||0,
+    qtd:parseInt(document.getElementById('f-qtd').value)||1,
+    resumo:document.getElementById('f-resumo').value.trim(),
+    descricao:document.getElementById('f-descricao').value.trim(),
+  };
+  if(!f.categoria||!f.data||!f.semana||!f.responsavel||!f.tipo||!f.resumo){alert('Preencha os campos obrigatórios (Categoria, Data, Referência, Responsável, Tipo e Resumo).');return;}
+  data.push(f);
+  saveData(data);
+  limparForm();
+  showToast();
+}
+
+function limparForm() {
+  ['f-categoria','f-data','f-semana','f-responsavel','f-identificou','f-tipo','f-motivo','f-impacto','f-valor','f-resumo','f-descricao'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('f-qtd').value='1';
+  document.getElementById('f-tipo').innerHTML='<option value="">Selecione a categoria primeiro</option>';
+  document.getElementById('f-data').value=new Date().toISOString().split('T')[0];
+}
+
+function showToast(){const t=document.getElementById('toast');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+
+function deletar(id){
+  if(!confirm('Excluir este erro?'))return;
+  saveData(loadData().filter(r=>r.id!==id));
+  renderDashboard();
+  renderLista();
+}
+
+function limparTodos(){
+  if(!confirm('Apagar TODOS os erros? Ação irreversível.'))return;
+  saveData([]);
+  renderDashboard();
+  renderLista();
+}
+
+// ── NAV ──────────────────────────────────────────────────────────────────
+function switchTab(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  const idx=['dashboard','form','lista'].indexOf(name);
+  document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+  if(name==='dashboard')renderDashboard();
+  if(name==='lista'){switchSubLista(listaFiltroCategoria||'todos');}
+}
+
+function switchSubDash(sub){
+  document.querySelectorAll('#view-dashboard .subview').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.subtab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('subdash-'+sub).classList.add('active');
+  const idx=['geral','janela','conciliacao','outros'].indexOf(sub);
+  document.querySelectorAll('.subtab-btn')[idx].classList.add('active');
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────────────
+function fmtDate(s){if(!s)return'—';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
+function respClass(r){return{Thaiane:'resp-thai',Kamilla:'resp-kamilla',DP:'resp-dp',Contabilidade:'resp-contabilidade'}[r]||'';}
+function impClass(i){return{'Retrabalho':'imp-retrabalho','Impacto financeiro':'imp-financeiro','Multa / Juros':'imp-multa','Ruído com outras áreas':'imp-ruido','Pagamento em atraso':'imp-atraso','Atraso em atividades':'imp-atraso'}[i]||'';}
+
+function exportCSV(){
+  const data = listaFiltroCategoria ? loadData().filter(r=>r.categoria===listaFiltroCategoria) : loadData();
+  const cols=['id','data','semana','categoria','responsavel','identificou','tipo','motivo','impacto','valor','resumo','descricao'];
+  const csv='\uFEFF'+[cols.join(';'),...data.map(r=>cols.map(c=>`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(';'))].join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='cp_erros_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+
+// ── USUÁRIO / CIÊNCIA ────────────────────────────────────────────────────
+const USER_KEY = 'cp_usuario';
+
+function getUsuario() {
+  return localStorage.getItem(USER_KEY) || null;
+}
+
+function definirUsuario(nome) {
+  localStorage.setItem(USER_KEY, nome);
+  document.getElementById('modal-usuario').style.display = 'none';
+  renderDashboard();
+  renderLista();
+}
+
+function checarUsuario(callback) {
+  if (getUsuario()) { callback(); return; }
+  document.getElementById('modal-usuario').style.display = 'flex';
+  // guarda callback para executar após seleção
+  window._pendingCiencia = callback;
+}
+
+// sobrescrever definirUsuario para rodar callback pendente
+const _defineOriginal = definirUsuario;
+function definirUsuario(nome) {
+  localStorage.setItem(USER_KEY, nome);
+  document.getElementById('modal-usuario').style.display = 'none';
+  if (window._pendingCiencia) { const cb = window._pendingCiencia; window._pendingCiencia = null; cb(); }
+  renderDashboard();
+  renderLista();
+}
+
+function darCiencia(id) {
+  checarUsuario(() => {
+    const usuario = getUsuario();
+    const data = loadData();
+    const rec = data.find(r => r.id === id);
+    if (!rec) return;
+    if (rec.responsavel !== usuario) {
+      alert('Você só pode dar ciência nos seus próprios erros.');
+      return;
+    }
+    rec.ciente = true;
+    rec.cienteEm = new Date().toLocaleString('pt-BR');
+    saveData(data);
+    renderDashboard();
+    renderLista();
+    renderTabAtual();
+  });
+}
+
+function renderTabAtual() {
+  // re-render whichever subdash is active
+  const active = document.querySelector('#view-dashboard .subview.active');
+  if (active) renderDashboard();
+}
+
+function cienciaCell(r) {
+  const usuario = getUsuario();
+  if (r.ciente) {
+    return `<span class="ciente-badge">✓ Ciente</span>`;
+  }
+  if (!usuario || r.responsavel === usuario) {
+    return `<button class="ciente-btn" onclick="darCiencia(${r.id})">Dar ciência</button>`;
+  }
+  return `<span class="nao-ciente-badge">Pendente</span>`;
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────
+seedIfEmpty();
+document.getElementById('f-data').value=new Date().toISOString().split('T')[0];
+renderDashboard();
+</script>
+</body>
+</html>
