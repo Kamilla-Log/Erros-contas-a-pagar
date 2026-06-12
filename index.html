@@ -500,8 +500,31 @@ function saveData(arr) { localStorage.setItem(KEY, JSON.stringify(arr)); }
 function byCategoria(cat) { return loadData().filter(r => r.categoria === cat); }
 
 // ── SEED ──────────────────────────────────────────────────────────────────
+function migrateFromPrevious() {
+  // Copia campos ciente/cienteEm de versões anteriores para a versão atual
+  const current = loadData();
+  if (!current.length) return;
+  let changed = false;
+  ['cp_erros_v1','cp_erros_v2','cp_erros_v3'].forEach(vKey => {
+    try {
+      const old = JSON.parse(localStorage.getItem(vKey) || '[]');
+      old.forEach(oldRec => {
+        if (!oldRec.ciente) return;
+        const match = current.find(r => r.id === oldRec.id);
+        if (match && !match.ciente) {
+          match.ciente = oldRec.ciente;
+          match.cienteEm = oldRec.cienteEm;
+          changed = true;
+        }
+      });
+    } catch(e) {}
+  });
+  if (changed) saveData(current);
+}
+
 function seedIfEmpty() {
-  ['cp_erros_v1','cp_erros_v2','cp_erros_v3'].forEach(k=>localStorage.removeItem(k));
+  // Migra ciências de versões anteriores (não apaga — só lê)
+  migrateFromPrevious();
   if (loadData().length > 0) return;
   const seed = [
     // ── JANELAS ─────────────────────────────────────────────────────────
