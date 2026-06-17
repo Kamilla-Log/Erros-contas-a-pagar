@@ -6,6 +6,7 @@
 <title>Tracker de Erros CP — Logcomex</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Funnel+Display:wght@700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
   --purple-dark:#2D085D; --purple-mid:#6613D0; --purple-light:#8E44ED; --purple-pale:#E2D0FA;
@@ -168,6 +169,7 @@ tbody tr:last-child td{border-bottom:none;}
     <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Dashboard</button>
     <button class="tab-btn" onclick="switchTab('form')">➕ Registrar</button>
     <button class="tab-btn" onclick="switchTab('lista')">📋 Todos os Erros</button>
+    <button class="tab-btn" onclick="recarregarDados()" title="Recarregar dados do servidor">🔄</button>
   </div>
 </div>
 
@@ -292,7 +294,14 @@ tbody tr:last-child td{border-bottom:none;}
   <div id="view-form" class="view">
     <div class="form-card">
       <div class="form-title">Registrar novo erro</div>
-      <div class="form-sub">Dados salvos localmente no navegador.</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:24px;">
+        <div class="form-sub" style="margin:0">Dados salvos localmente no navegador.</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="font-size:12px;color:var(--muted)">Modo:</span>
+          <button id="btn-modo-simples" onclick="setModo('simples')" style="padding:6px 16px;border-radius:8px;border:none;font-family:Poppins,sans-serif;font-size:12px;font-weight:600;cursor:pointer;background:var(--purple-mid);color:#fff;">Simples</button>
+          <button id="btn-modo-lote" onclick="setModo('lote')" style="padding:6px 16px;border-radius:8px;border:1.5px solid var(--border);font-family:Poppins,sans-serif;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:var(--muted);">Lote</button>
+        </div>
+      </div>
 
       <div class="section-label">Classificação principal</div>
       <div class="form-grid">
@@ -320,7 +329,11 @@ tbody tr:last-child td{border-bottom:none;}
       <div class="form-grid">
         <div class="form-field">
           <label>Tipo de erro <span class="req">*</span></label>
-          <select id="f-tipo"><option value="">Selecione a categoria primeiro</option></select>
+          <select id="f-tipo" onchange="toggleOutroTipo()"><option value="">Selecione a categoria primeiro</option></select>
+        </div>
+        <div class="form-field" id="f-outro-tipo-wrap" style="display:none;">
+          <label>Qual tipo? <span class="req">*</span></label>
+          <input type="text" id="f-outro-tipo" placeholder="Descreva o tipo de erro">
         </div>
         <div class="form-field">
           <label>Causa raiz</label>
@@ -390,8 +403,23 @@ tbody tr:last-child td{border-bottom:none;}
         </div>
       </div>
 
+      <!-- MODO LOTE -->
+      <div id="lote-section" style="display:none;margin-top:20px;">
+        <hr class="divider">
+        <div class="section-label">Itens do lote</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Preencha os campos acima (categoria, data, referência, responsável) e adicione quantos tipos de erro quiser abaixo.</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <select id="lote-tipo" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-family:Poppins,sans-serif;font-size:13px;"><option value="">Tipo de erro...</option></select>
+          <input type="text" id="lote-tipo-outro" placeholder="Especificar tipo..." style="display:none;flex:1;min-width:150px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-family:Poppins,sans-serif;font-size:13px;">
+          <input type="number" id="lote-qtd" value="1" min="1" placeholder="Qtd" style="width:80px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-family:Poppins,sans-serif;font-size:13px;">
+          <button onclick="adicionarItemLote()" style="padding:8px 18px;background:var(--purple-mid);color:#fff;border:none;border-radius:8px;font-family:Poppins,sans-serif;font-size:13px;font-weight:600;cursor:pointer;">+ Adicionar</button>
+        </div>
+        <div id="lote-lista" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;"></div>
+        <div id="lote-total" style="font-size:12px;color:var(--muted);"></div>
+      </div>
+
       <div>
-        <button class="btn-submit" onclick="salvarErro()">✅ Salvar erro</button>
+        <button class="btn-submit" id="btn-salvar" onclick="salvarErro()">✅ Salvar erro</button>
         <button class="btn-clear" onclick="limparForm()">Limpar</button>
       </div>
     </div>
@@ -490,42 +518,166 @@ function updateTiposForm() {
   const sel = document.getElementById('f-tipo');
   sel.innerHTML = '<option value="">Selecionar...</option>';
   if (cat && TIPOS[cat]) TIPOS[cat].forEach(t => { const o = document.createElement('option'); o.value = t; o.text = t; sel.appendChild(o); });
+  // Atualiza também o select do lote
+  const loteSel = document.getElementById('lote-tipo');
+  if (loteSel) {
+    loteSel.innerHTML = '<option value="">Tipo de erro...</option>';
+    if (cat && TIPOS[cat]) TIPOS[cat].forEach(t => { const o = document.createElement('option'); o.value = t; o.text = t; loteSel.appendChild(o); });
+  }
+}
+
+function toggleOutroTipo() {
+  const val = document.getElementById('f-tipo').value;
+  const wrap = document.getElementById('f-outro-tipo-wrap');
+  if (wrap) wrap.style.display = val === 'Outro' ? 'flex' : 'none';
+}
+
+// ── MODO SIMPLES / LOTE ──────────────────────────────────────────────────
+let modoAtual = 'simples';
+let itenslote = [];
+
+function setModo(modo) {
+  modoAtual = modo;
+  document.getElementById('lote-section').style.display = modo === 'lote' ? 'block' : 'none';
+  document.getElementById('btn-modo-simples').style.background = modo === 'simples' ? 'var(--purple-mid)' : '#fff';
+  document.getElementById('btn-modo-simples').style.color = modo === 'simples' ? '#fff' : 'var(--muted)';
+  document.getElementById('btn-modo-simples').style.border = modo === 'simples' ? 'none' : '1.5px solid var(--border)';
+  document.getElementById('btn-modo-lote').style.background = modo === 'lote' ? 'var(--purple-mid)' : '#fff';
+  document.getElementById('btn-modo-lote').style.color = modo === 'lote' ? '#fff' : 'var(--muted)';
+  document.getElementById('btn-modo-lote').style.border = modo === 'lote' ? 'none' : '1.5px solid var(--border)';
+  document.getElementById('btn-salvar').textContent = modo === 'lote' ? '✅ Salvar lote' : '✅ Salvar erro';
+  if (modo === 'lote') { itenslote = []; renderLote(); }
+}
+
+document.getElementById('lote-tipo') && document.getElementById('lote-tipo').addEventListener('change', function() {
+  const outro = document.getElementById('lote-tipo-outro');
+  if (outro) outro.style.display = this.value === 'Outro' ? 'inline-block' : 'none';
+});
+
+function adicionarItemLote() {
+  const tipoEl = document.getElementById('lote-tipo');
+  const outroEl = document.getElementById('lote-tipo-outro');
+  const qtdEl = document.getElementById('lote-qtd');
+  let tipo = tipoEl ? tipoEl.value : '';
+  if (tipo === 'Outro' && outroEl && outroEl.value.trim()) tipo = outroEl.value.trim();
+  const qtd = parseInt(qtdEl ? qtdEl.value : 1) || 1;
+  if (!tipo) { alert('Selecione o tipo de erro.'); return; }
+  itenslote.push({ tipo, qtd });
+  if (tipoEl) tipoEl.value = '';
+  if (outroEl) { outroEl.value = ''; outroEl.style.display = 'none'; }
+  if (qtdEl) qtdEl.value = 1;
+  renderLote();
+}
+
+function renderLote() {
+  const lista = document.getElementById('lote-lista');
+  const total = document.getElementById('lote-total');
+  if (!lista) return;
+  if (!itenslote.length) { lista.innerHTML = ''; if(total) total.textContent = ''; return; }
+  lista.innerHTML = itenslote.map((item, i) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#F8F6FF;border-radius:8px;padding:8px 14px;font-size:13px;">
+      <span>${item.tipo} <strong style="color:var(--purple-mid)">×${item.qtd}</strong></span>
+      <button onclick="removerItemLote(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;">✕</button>
+    </div>`).join('');
+  const soma = itenslote.reduce((a, i) => a + i.qtd, 0);
+  if (total) total.textContent = `Total: ${itenslote.length} tipo(s) — ${soma} erro(s)`;
+}
+
+function removerItemLote(idx) {
+  itenslote.splice(idx, 1);
+  renderLote();
 }
 
 // ── STORAGE ───────────────────────────────────────────────────────────────
-const KEY = 'cp_erros_v4';
-function loadData() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } }
-function saveData(arr) { localStorage.setItem(KEY, JSON.stringify(arr)); }
+// ── SUPABASE ──────────────────────────────────────────────────────────────
+const SUPA_URL = 'https://moikuofjjyvleorbfhay.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vaWt1b2Zqanl2bGVvcmJmaGF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2ODYyOTgsImV4cCI6MjA5NzI2MjI5OH0.IL-sCw1Pi-QNSPfTVeeI6WEjbnUoGKVCJ6lYdm0aD6o';
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// Cache local para performance
+let _cache = null;
+let _loading = false;
+
+function showLoader(msg) {
+  let el = document.getElementById('loader-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'loader-overlay';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.75);display:flex;align-items:center;justify-content:center;z-index:9998;font-family:Poppins,sans-serif;font-size:14px;color:#6613D0;gap:10px;';
+    el.innerHTML = '<div style="width:20px;height:20px;border:3px solid #E2D0FA;border-top-color:#6613D0;border-radius:50%;animation:spin 0.7s linear infinite"></div><span id="loader-msg"></span>';
+    const style = document.createElement('style');
+    style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(style);
+    document.body.appendChild(el);
+  }
+  document.getElementById('loader-msg').textContent = msg || 'Carregando...';
+  el.style.display = 'flex';
+}
+function hideLoader() {
+  const el = document.getElementById('loader-overlay');
+  if (el) el.style.display = 'none';
+}
+
+async function loadDataAsync() {
+  showLoader('Carregando dados...');
+  const { data, error } = await supa.from('erros_cp').select('*').order('id', {ascending: true});
+  hideLoader();
+  if (error) { console.error('Supabase load error:', error); return []; }
+  _cache = data.map(r => ({
+    ...r,
+    valor: parseFloat(r.valor) || 0,
+    qtd: parseInt(r.qtd) || 1,
+    ciente: r.ciente || false,
+    cienteEm: r.ciente_em || null,
+  }));
+  return _cache;
+}
+
+function loadData() {
+  return _cache || [];
+}
+
+async function saveRecords(records) {
+  // Upsert array of records
+  const rows = records.map(r => ({
+    id: r.id,
+    categoria: r.categoria,
+    data: r.data,
+    semana: r.semana,
+    responsavel: r.responsavel,
+    identificou: r.identificou,
+    tipo: r.tipo,
+    motivo: r.motivo,
+    impacto: r.impacto,
+    valor: r.valor || 0,
+    qtd: r.qtd || 1,
+    resumo: r.resumo,
+    descricao: r.descricao,
+    ciente: r.ciente || false,
+    ciente_em: r.cienteEm || null,
+  }));
+  const { error } = await supa.from('erros_cp').upsert(rows, {onConflict: 'id'});
+  if (error) { console.error('Supabase save error:', error); return false; }
+  return true;
+}
+
+async function deleteRecord(id) {
+  const { error } = await supa.from('erros_cp').delete().eq('id', id);
+  if (error) { console.error('Supabase delete error:', error); return false; }
+  return true;
+}
+
+async function getNextId() {
+  const data = loadData();
+  return data.length ? Math.max(...data.map(r=>r.id)) + 1 : 1;
+}
 
 function byCategoria(cat) { return loadData().filter(r => r.categoria === cat); }
 
 // ── SEED ──────────────────────────────────────────────────────────────────
-function migrateFromPrevious() {
-  // Copia campos ciente/cienteEm de versões anteriores para a versão atual
-  const current = loadData();
-  if (!current.length) return;
-  let changed = false;
-  ['cp_erros_v1','cp_erros_v2','cp_erros_v3'].forEach(vKey => {
-    try {
-      const old = JSON.parse(localStorage.getItem(vKey) || '[]');
-      old.forEach(oldRec => {
-        if (!oldRec.ciente) return;
-        const match = current.find(r => r.id === oldRec.id);
-        if (match && !match.ciente) {
-          match.ciente = oldRec.ciente;
-          match.cienteEm = oldRec.cienteEm;
-          changed = true;
-        }
-      });
-    } catch(e) {}
-  });
-  if (changed) saveData(current);
-}
-
-function seedIfEmpty() {
-  // Migra ciências de versões anteriores (não apaga — só lê)
-  migrateFromPrevious();
-  if (loadData().length > 0) return;
+async function seedIfEmpty() {
+  const existing = loadData();
+  if (existing.length > 0) return;
   const seed = [
     // ── JANELAS ─────────────────────────────────────────────────────────
     // Janela 01/04 — 21 erros
@@ -646,7 +798,10 @@ function seedIfEmpty() {
     {id:96,data:'2026-05-20',semana:'Maio',categoria:'outros',responsavel:'Thaiane',identificou:'Kamilla',tipo:'Falta de lançamento no Omie',motivo:'Lançamentos não encontrados no Omie',impacto:'Retrabalho',valor:0,qtd:13,resumo:'13 lançamentos não efetuados no Omie no dia da baixa',descricao:''},
     {id:97,data:'2026-05-21',semana:'Maio',categoria:'outros',responsavel:'Kamilla',identificou:'Kamilla',tipo:'Falta de lançamento no Omie',motivo:'Falta de atenção',impacto:'Retrabalho',valor:0,qtd:1,resumo:'Leverpro residual do ano passado ficou em aberto — NF recebida não subiu para pagamento',descricao:''},
   ];
-  saveData(seed);
+  showLoader('Populando dados iniciais...');
+  await saveRecords(seed);
+  _cache = seed;
+  hideLoader();
 }
 
 // ── CHARTS ────────────────────────────────────────────────────────────────
@@ -870,55 +1025,98 @@ function renderLista() {
 }
 
 // ── FORM ─────────────────────────────────────────────────────────────────
-function salvarErro() {
+async function salvarErro() {
   const data = loadData();
+  const categoria = document.getElementById('f-categoria').value;
+  const dataVal = document.getElementById('f-data').value;
+  const semana = document.getElementById('f-semana').value.trim();
+  const responsavel = document.getElementById('f-responsavel').value;
+  const identificou = document.getElementById('f-identificou').value;
+  const motivo = document.getElementById('f-motivo').value;
+  const impacto = document.getElementById('f-impacto').value;
+  const valor = parseFloat(document.getElementById('f-valor').value)||0;
+  const resumo = document.getElementById('f-resumo').value.trim();
+  const descricao = document.getElementById('f-descricao').value.trim();
+
+  if (modoAtual === 'lote') {
+    if (!categoria||!dataVal||!semana||!responsavel) { alert('Preencha Categoria, Data, Referência e Responsável.'); return; }
+    if (!itenslote.length) { alert('Adicione pelo menos um item ao lote.'); return; }
+    let nextId = await getNextId();
+    const novos = [];
+    itenslote.forEach(item => {
+      novos.push({ id:nextId++, categoria, data:dataVal, semana, responsavel, identificou, tipo:item.tipo, motivo, impacto, valor:0, qtd:item.qtd, resumo:item.tipo, descricao });
+    });
+    showLoader('Salvando lote...');
+    await saveRecords(novos);
+    _cache = [...loadData(), ...novos];
+    hideLoader();
+    itenslote = [];
+    renderLote();
+    limparForm();
+    renderDashboard();
+    renderLista();
+    showToast('✅ Lote salvo com sucesso!');
+    return;
+  }
+
+  // Modo simples
+  let tipo = document.getElementById('f-tipo').value;
+  const outroTipo = document.getElementById('f-outro-tipo');
+  if (tipo === 'Outro' && outroTipo && outroTipo.value.trim()) tipo = outroTipo.value.trim();
+  const qtd = parseInt(document.getElementById('f-qtd').value)||1;
   const novoId = data.length ? Math.max(...data.map(r=>r.id))+1 : 1;
-  const f = {
-    id:novoId,
-    categoria:document.getElementById('f-categoria').value,
-    data:document.getElementById('f-data').value,
-    semana:document.getElementById('f-semana').value.trim(),
-    responsavel:document.getElementById('f-responsavel').value,
-    identificou:document.getElementById('f-identificou').value,
-    tipo:document.getElementById('f-tipo').value,
-    motivo:document.getElementById('f-motivo').value,
-    impacto:document.getElementById('f-impacto').value,
-    valor:parseFloat(document.getElementById('f-valor').value)||0,
-    qtd:parseInt(document.getElementById('f-qtd').value)||1,
-    resumo:document.getElementById('f-resumo').value.trim(),
-    descricao:document.getElementById('f-descricao').value.trim(),
-  };
-  if(!f.categoria||!f.data||!f.semana||!f.responsavel||!f.tipo||!f.resumo){alert('Preencha os campos obrigatórios (Categoria, Data, Referência, Responsável, Tipo e Resumo).');return;}
-  data.push(f);
-  saveData(data);
+  const f = { id:novoId, categoria, data:dataVal, semana, responsavel, identificou, tipo, motivo, impacto, valor, qtd, resumo, descricao };
+  if(!f.categoria||!f.data||!f.semana||!f.responsavel||!f.tipo||!f.resumo){ alert('Preencha os campos obrigatórios (Categoria, Data, Referência, Responsável, Tipo e Resumo).'); return; }
+  showLoader('Salvando...');
+  await saveRecords([f]);
+  if (!_cache) _cache = [];
+  _cache.push(f);
+  hideLoader();
   limparForm();
-  showToast();
+  renderDashboard();
+  renderLista();
+  showToast('✅ Erro registrado com sucesso!');
 }
 
 function limparForm() {
   ['f-categoria','f-data','f-semana','f-responsavel','f-identificou','f-tipo','f-motivo','f-impacto','f-valor','f-resumo','f-descricao'].forEach(id=>{document.getElementById(id).value='';});
   document.getElementById('f-qtd').value='1';
   document.getElementById('f-tipo').innerHTML='<option value="">Selecione a categoria primeiro</option>';
+  const ot=document.getElementById('f-outro-tipo'); if(ot){ot.value='';}
+  const otw=document.getElementById('f-outro-tipo-wrap'); if(otw){otw.style.display='none';}
   document.getElementById('f-data').value=new Date().toISOString().split('T')[0];
 }
 
-function showToast(){const t=document.getElementById('toast');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg||'✅ Erro registrado com sucesso!';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 
-function deletar(id){
+async function deletar(id){
   if(!confirm('Excluir este erro?'))return;
-  saveData(loadData().filter(r=>r.id!==id));
+  showLoader('Excluindo...');
+  await deleteRecord(id);
+  _cache = _cache.filter(r=>r.id!==id);
+  hideLoader();
   renderDashboard();
   renderLista();
 }
 
-function limparTodos(){
+async function limparTodos(){
   if(!confirm('Apagar TODOS os erros? Ação irreversível.'))return;
-  saveData([]);
+  showLoader('Apagando...');
+  await supa.from('erros_cp').delete().neq('id', 0);
+  _cache = [];
+  hideLoader();
   renderDashboard();
   renderLista();
 }
 
 // ── NAV ──────────────────────────────────────────────────────────────────
+async function recarregarDados(){
+  await loadDataAsync();
+  renderDashboard();
+  renderLista();
+  showToast('✅ Dados atualizados!');
+}
+
 function switchTab(name){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
@@ -993,7 +1191,9 @@ function darCiencia(id) {
     }
     rec.ciente = true;
     rec.cienteEm = new Date().toLocaleString('pt-BR');
-    saveData(data);
+    showLoader('Salvando ciência...');
+    await supa.from('erros_cp').update({ciente: true, ciente_em: rec.cienteEm}).eq('id', id);
+    hideLoader();
     renderDashboard();
     renderLista();
     renderTabAtual();
@@ -1018,9 +1218,18 @@ function cienciaCell(r) {
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────
-seedIfEmpty();
-document.getElementById('f-data').value=new Date().toISOString().split('T')[0];
-renderDashboard();
+(async () => {
+  showLoader('Conectando ao banco de dados...');
+  await loadDataAsync();
+  hideLoader();
+  await seedIfEmpty();
+  // Re-carrega após seed
+  if (loadData().length === 0) {
+    await loadDataAsync();
+  }
+  document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
+  renderDashboard();
+})();
 </script>
 </body>
 </html>
