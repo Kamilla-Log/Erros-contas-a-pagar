@@ -6,7 +6,7 @@
 <title>Tracker de Erros CP — Logcomex</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Funnel+Display:wght@700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 :root {
   --purple-dark:#2D085D; --purple-mid:#6613D0; --purple-light:#8E44ED; --purple-pale:#E2D0FA;
@@ -592,7 +592,7 @@ function removerItemLote(idx) {
 // ── SUPABASE ──────────────────────────────────────────────────────────────
 const SUPA_URL = 'https://moikuofjjyvleorbfhay.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vaWt1b2Zqanl2bGVvcmJmaGF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2ODYyOTgsImV4cCI6MjA5NzI2MjI5OH0.IL-sCw1Pi-QNSPfTVeeI6WEjbnUoGKVCJ6lYdm0aD6o';
-const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+const supa = (supabase.createClient || window.supabase.createClient)(SUPA_URL, SUPA_KEY);
 
 // Cache local para performance
 let _cache = null;
