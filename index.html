@@ -6,7 +6,7 @@
 <title>Tracker de Erros CP — Logcomex</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Funnel+Display:wght@700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
 <style>
 :root {
   --purple-dark:#2D085D; --purple-mid:#6613D0; --purple-light:#8E44ED; --purple-pale:#E2D0FA;
@@ -589,10 +589,29 @@ function removerItemLote(idx) {
 }
 
 // ── STORAGE ───────────────────────────────────────────────────────────────
-// ── SUPABASE ──────────────────────────────────────────────────────────────
+// ── SUPABASE REST API (sem client JS) ─────────────────────────────────────
 const SUPA_URL = 'https://moikuofjjyvleorbfhay.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vaWt1b2Zqanl2bGVvcmJmaGF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2ODYyOTgsImV4cCI6MjA5NzI2MjI5OH0.IL-sCw1Pi-QNSPfTVeeI6WEjbnUoGKVCJ6lYdm0aD6o';
-const supa = (supabase.createClient || window.supabase.createClient)(SUPA_URL, SUPA_KEY);
+
+async function sbFetch(method, path, body) {
+  const res = await fetch(SUPA_URL + '/rest/v1/' + path, {
+    method,
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'resolution=merge-duplicates' : '',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error('Supabase error:', res.status, err);
+    return null;
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
+}
 
 // Cache local para performance
 let _cache = null;
@@ -620,9 +639,9 @@ function hideLoader() {
 
 async function loadDataAsync() {
   showLoader('Carregando dados...');
-  const { data, error } = await supa.from('erros_cp').select('*').order('id', {ascending: true});
+  const data = await sbFetch('GET', 'erros_cp?select=*&order=id.asc');
   hideLoader();
-  if (error) { console.error('Supabase load error:', error); return []; }
+  if (!data) return [];
   _cache = data.map(r => ({
     ...r,
     valor: parseFloat(r.valor) || 0,
@@ -638,7 +657,6 @@ function loadData() {
 }
 
 async function saveRecords(records) {
-  // Upsert array of records
   const rows = records.map(r => ({
     id: r.id,
     categoria: r.categoria,
@@ -656,15 +674,30 @@ async function saveRecords(records) {
     ciente: r.ciente || false,
     ciente_em: r.cienteEm || null,
   }));
-  const { error } = await supa.from('erros_cp').upsert(rows, {onConflict: 'id'});
-  if (error) { console.error('Supabase save error:', error); return false; }
+  // Upsert via REST POST com Prefer: resolution=merge-duplicates
+  const res = await fetch(SUPA_URL + '/rest/v1/erros_cp', {
+    method: 'POST',
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates',
+    },
+    body: JSON.stringify(rows),
+  });
+  if (!res.ok) { const e = await res.text(); console.error('Save error:', e); return false; }
   return true;
 }
 
 async function deleteRecord(id) {
-  const { error } = await supa.from('erros_cp').delete().eq('id', id);
-  if (error) { console.error('Supabase delete error:', error); return false; }
-  return true;
+  const res = await fetch(SUPA_URL + '/rest/v1/erros_cp?id=eq.' + id, {
+    method: 'DELETE',
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+    },
+  });
+  return res.ok;
 }
 
 async function getNextId() {
@@ -1102,7 +1135,10 @@ async function deletar(id){
 async function limparTodos(){
   if(!confirm('Apagar TODOS os erros? Ação irreversível.'))return;
   showLoader('Apagando...');
-  await supa.from('erros_cp').delete().neq('id', 0);
+  await fetch(SUPA_URL + '/rest/v1/erros_cp?id=neq.0', {
+    method: 'DELETE',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY },
+  });
   _cache = [];
   hideLoader();
   renderDashboard();
@@ -1192,7 +1228,11 @@ function darCiencia(id) {
     rec.ciente = true;
     rec.cienteEm = new Date().toLocaleString('pt-BR');
     showLoader('Salvando ciência...');
-    await supa.from('erros_cp').update({ciente: true, ciente_em: rec.cienteEm}).eq('id', id);
+    await fetch(SUPA_URL + '/rest/v1/erros_cp?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ciente: true, ciente_em: rec.cienteEm }),
+    });
     hideLoader();
     renderDashboard();
     renderLista();
