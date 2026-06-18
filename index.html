@@ -127,6 +127,11 @@ tbody tr:last-child td{border-bottom:none;}
 .ciente-btn:hover{background:var(--purple-mid);color:#fff;}
 .ciente-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#DCFCE7;color:#166534;border-radius:20px;font-size:11px;font-weight:600;}
 .nao-ciente-badge{display:inline-block;padding:3px 10px;background:#F3F4F6;color:var(--muted);border-radius:20px;font-size:11px;}
+.comentario-wrap{display:flex;align-items:center;gap:6px;}
+.comentario-input{padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-family:'Poppins',sans-serif;font-size:11px;color:var(--fg);background:#fff;width:160px;transition:border-color 0.15s;outline:none;}
+.comentario-input:focus{border-color:var(--purple-mid);}
+.comentario-btn{padding:3px 10px;background:var(--purple-mid);color:#fff;border:none;border-radius:6px;font-family:'Poppins',sans-serif;font-size:11px;cursor:pointer;white-space:nowrap;}
+.comentario-salvo{font-size:11px;color:var(--muted);font-style:italic;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:9999;}
 .modal-box{background:#fff;border-radius:16px;padding:36px 32px;max-width:380px;width:90%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.18);}
 .modal-title{font-family:'Funnel Display',sans-serif;font-size:20px;font-weight:700;margin-bottom:8px;}
@@ -1016,7 +1021,7 @@ function renderMiniTabela(id, data) {
   const el = document.getElementById(id);
   const sorted = [...data].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
   if(!sorted.length){el.innerHTML='<div class="empty-state"><div class="icon">📭</div><div>Sem registros.</div></div>';return;}
-  el.innerHTML=`<table><thead><tr><th>Data</th><th>Referência</th><th>Responsável</th><th>Tipo</th><th>Impacto</th><th>Valor</th><th>Resumo</th><th>Ciência</th><th></th></tr></thead>
+  el.innerHTML=`<table><thead><tr><th>Data</th><th>Referência</th><th>Responsável</th><th>Tipo</th><th>Impacto</th><th>Valor</th><th>Resumo</th><th>Comentário</th><th>Ciência</th><th></th></tr></thead>
   <tbody>${sorted.map(r=>`<tr>
     <td style="white-space:nowrap">${fmtDate(r.data)}</td>
     <td style="white-space:nowrap;font-size:11px;color:var(--muted)">${r.semana||'—'}</td>
@@ -1025,6 +1030,7 @@ function renderMiniTabela(id, data) {
     <td><span class="pill ${impClass(r.impacto)}">${r.impacto||'—'}</span></td>
     <td style="white-space:nowrap;color:${r.valor>0?'var(--danger)':'var(--muted)'};font-size:11px">${r.valor>0?'R$'+parseFloat(r.valor).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}</td>
     <td style="max-width:200px;font-size:11px">${r.resumo||'—'}${r.qtd>1?' <span style="color:var(--muted);font-weight:600">(×'+r.qtd+')</span>':''}</td>
+    <td>${comentarioCell(r)}</td>
     <td>${cienciaCell(r)}</td>
     <td><button onclick="deletar(${r.id})" style="background:none;border:none;cursor:pointer;color:var(--muted)" title="Excluir">🗑</button></td>
   </tr>`).join('')}</tbody></table>`;
@@ -1244,6 +1250,29 @@ function renderTabAtual() {
   // re-render whichever subdash is active
   const active = document.querySelector('#view-dashboard .subview.active');
   if (active) renderDashboard();
+}
+
+async function salvarComentario(id, val) {
+  const data = loadData();
+  const rec = data.find(r => r.id === id);
+  if (!rec) return;
+  rec.descricao = val;
+  await fetch(SUPA_URL + '/rest/v1/erros_cp?id=eq.' + id, {
+    method: 'PATCH',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ descricao: val }),
+  });
+  renderDashboard();
+  renderLista();
+  showToast('✅ Comentário salvo!');
+}
+
+function comentarioCell(r) {
+  const val = r.descricao || '';
+  return `<div class="comentario-wrap">
+    <input class="comentario-input" id="com-${r.id}" type="text" value="${val.replace(/"/g,'&quot;')}" placeholder="Comentar...">
+    <button class="comentario-btn" onclick="salvarComentario(${r.id}, document.getElementById('com-${r.id}').value)">💬</button>
+  </div>`;
 }
 
 function cienciaCell(r) {
